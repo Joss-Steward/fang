@@ -55,7 +55,7 @@ let ParseMessage (line: string) =
         COMD(number, who, text)
     | Match @":([^!]+)!([^@]+)@([^ ]+) PRIVMSG ([^ ]+) :(.+)$" [nick; user; host; dest; mesg] -> 
         PRIV({Nick=nick; User=user; Host=host; Dest=dest; Mesg=mesg})
-    | Match @":([^!]+)!([^@]+)@([^ ]+) JOIN ([^ ]+)$" [nick; user; host; chan] -> 
+    | Match @":([^!]+)!([^@]+)@([^ ]+) JOIN :([^ ]+)$" [nick; user; host; chan] -> 
         JOIN({Nick=nick; User=user; Host=host; Chan=chan})
     | Match @":([^!]+)[^ ]+ QUIT :(.+)$" [user; reason] -> 
         QUIT(user, reason)

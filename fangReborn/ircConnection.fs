@@ -1,7 +1,9 @@
 ﻿module ircConnection
 
 open ircTypes
+open System
 open System.IO
+open System.Threading
 open System.Net.Sockets
 
 type IRCConnection(server: string, port: int, nick: string, password: string, channels: list<string>) =
@@ -11,15 +13,26 @@ type IRCConnection(server: string, port: int, nick: string, password: string, ch
     let oStream = new StreamWriter(tcpClient.GetStream())
 
     let recv = fun() ->
-        ParseMessage (iStream.ReadLine())
+        try
+            ParseMessage (iStream.ReadLine())
+        with
+            | :? System.IO.IOException as ex -> 
+                Console.WriteLine("!! NETWORK FAILURE: " + ex.Message)
+                ERRO("NETWORK FAILURE")
         
     let sendraw (message: string) =
-        oStream.WriteLine(message)
+        try
+            oStream.WriteLine(message)
+        with
+            | :? System.IO.IOException as ex ->
+                Console.WriteLine("!! NETWORK FAILURE: " + ex.Message)
+
 
     let send (message: outMessage) =
         match message with
         | DM(dest, message) ->
-            oStream.WriteLine(sprintf "PRIVMSG %s :%s" dest message)
+            sendraw(sprintf "PRIVMSG %s :%s" dest message)
+            Console.WriteLine(("<< PRIV: {" + dest + "}").PadRight(18) + "fang".PadLeft(13) + " | \"" + message + "\"")
 
     let outbox = MailboxProcessor.Start(fun inbox ->
             async {
@@ -65,7 +78,12 @@ type IRCConnection(server: string, port: int, nick: string, password: string, ch
 
                 // And then there are individual event streams for private messages, joins, and quits
                 match message with 
-                | PRIV(priv) -> privateMessages.Trigger(priv)
-                | JOIN(join) -> joinMessages.Trigger(join)
-                | QUIT(who, why) -> quitMessages.Trigger(who, why)
+                | PRIV(priv) -> 
+                    privateMessages.Trigger(priv)
+                    Console.WriteLine((">> PRIV: {" + priv.Dest + "}").PadRight(18) + priv.Nick.PadLeft(13) + " | \"" + priv.Mesg + "\"")
+                | JOIN(join) -> 
+                    joinMessages.Trigger(join)
+                    Console.WriteLine((">> JOIN: {" + join.Chan + "}").PadRight(18) + join.Nick.PadLeft(13) + " | ")
+                | QUIT(who, why) -> 
+                    quitMessages.Trigger(who, why)
                 | _ -> ()
